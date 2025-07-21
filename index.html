@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Pong Game</title>
+    <style>
+        body {
+            background: #9d9d9d;
+            color: #fff;
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            margin-top: 20px;
+            font-size: 2rem;
+            letter-spacing: 2px;
+        }
+
+        #pong {
+            background: #111;
+            display: block;
+            margin: 30px auto 0 auto;
+            border: 3px solid #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 18px #000;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Simple Pong Game</h1>
+    <canvas id="pong" width="800" height="500"></canvas>
+    <script>
+        const canvas = document.getElementById("pong");
+        const ctx = canvas.getContext("2d");
+
+        // Game constants
+        const PADDLE_WIDTH = 15;
+        const PADDLE_HEIGHT = 100;
+        const BALL_RADIUS = 10;
+        const PLAYER_X = 20;
+        const AI_X = canvas.width - PADDLE_WIDTH - 20;
+        const PADDLE_SPEED = 6;
+        const AI_SPEED = 4;
+
+        // Game state
+        let playerY = (canvas.height - PADDLE_HEIGHT) / 2;
+        let aiY = (canvas.height - PADDLE_HEIGHT) / 2;
+        let ball = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            vx: 5 * (Math.random() > 0.5 ? 1 : -1),
+            vy: 4 * (Math.random() * 2 - 1),
+            radius: BALL_RADIUS
+        };
+        let playerScore = 0;
+        let aiScore = 0;
+
+        // Mouse controls
+        canvas.addEventListener("mousemove", function (e) {
+            const bounds = canvas.getBoundingClientRect();
+            let mouseY = e.clientY - bounds.top;
+            playerY = Math.max(0, Math.min(canvas.height - PADDLE_HEIGHT, mouseY - PADDLE_HEIGHT / 2));
+        });
+
+        // Draw functions
+        function drawRect(x, y, w, h, color = "#fff") {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, w, h);
+        }
+        function drawCircle(x, y, r, color = "#fff") {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.fill();
+        }
+        function drawNet() {
+            ctx.strokeStyle = "#fff";
+            ctx.setLineDash([8, 16]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Collision detection
+        function collide(paddleX, paddleY) {
+            // Closest point on paddle to ball
+            let closestY = Math.max(paddleY, Math.min(ball.y, paddleY + PADDLE_HEIGHT));
+            let closestX = Math.max(paddleX, Math.min(ball.x, paddleX + PADDLE_WIDTH));
+            let dx = ball.x - closestX;
+            let dy = ball.y - closestY;
+            return dx * dx + dy * dy < ball.radius * ball.radius;
+        }
+
+        // Main update loop
+        function update() {
+            // Move ball
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Top/bottom collision
+            if (ball.y - ball.radius < 0) {
+                ball.y = ball.radius;
+                ball.vy *= -1;
+            } else if (ball.y + ball.radius > canvas.height) {
+                ball.y = canvas.height - ball.radius;
+                ball.vy *= -1;
+            }
+
+            // Player paddle collision
+            if (
+                ball.x - ball.radius < PLAYER_X + PADDLE_WIDTH &&
+                collide(PLAYER_X, playerY)
+            ) {
+                ball.x = PLAYER_X + PADDLE_WIDTH + ball.radius;
+                ball.vx *= -1.07; // Slightly increase ball speed each hit
+                // Add some "spin"
+                let collidePoint = (ball.y - (playerY + PADDLE_HEIGHT / 2)) / (PADDLE_HEIGHT / 2);
+                ball.vy += collidePoint * 4;
+            }
+
+            // AI paddle collision
+            if (
+                ball.x + ball.radius > AI_X &&
+                collide(AI_X, aiY)
+            ) {
+                ball.x = AI_X - ball.radius;
+                ball.vx *= -1.07;
+                let collidePoint = (ball.y - (aiY + PADDLE_HEIGHT / 2)) / (PADDLE_HEIGHT / 2);
+                ball.vy += collidePoint * 4;
+            }
+
+            // Left/right wall (reset ball)
+            if (ball.x < 0) {
+                aiScore++;
+                resetBall();
+            } else if (ball.x > canvas.width) {
+                playerScore++;
+                resetBall();
+            }
+
+            // AI movement (very basic)
+            let aiCenter = aiY + PADDLE_HEIGHT / 2;
+            if (ball.y < aiCenter - 10) {
+                aiY -= AI_SPEED;
+            } else if (ball.y > aiCenter + 10) {
+                aiY += AI_SPEED;
+            }
+            aiY = Math.max(0, Math.min(canvas.height - PADDLE_HEIGHT, aiY));
+        }
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.vx = 5 * (Math.random() > 0.5 ? 1 : -1);
+            ball.vy = 4 * (Math.random() * 2 - 1);
+        }
+
+        function render() {
+            // Clear
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw net
+            drawNet();
+
+            // Draw paddles
+            drawRect(PLAYER_X, playerY, PADDLE_WIDTH, PADDLE_HEIGHT, "#00eaff");
+            drawRect(AI_X, aiY, PADDLE_WIDTH, PADDLE_HEIGHT, "#ff006c");
+
+            // Draw ball
+            drawCircle(ball.x, ball.y, ball.radius, "#fff");
+
+            // Draw scores
+            ctx.font = "32px Arial";
+            ctx.fillStyle = "#fff";
+            ctx.textAlign = "center";
+            ctx.fillText(playerScore, canvas.width / 4, 50);
+            ctx.fillText(aiScore, canvas.width * 3 / 4, 50);
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+
+</html>
